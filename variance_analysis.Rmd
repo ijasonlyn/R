@@ -1,0 +1,101 @@
+---
+title: "variance Analysis"
+author: "Jason"
+date: "2020/12/7"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+a: actual
+
+b: benchmark
+
+$$
+\begin{align}
+& \sum_i{p_i^a q_i^a} - \sum_i{p_i^bq_i^b} \\
+=& \sum_i{p_i^a q_i^a} - \sum_i{p_i^bq_i^b} + \sum_i{p_i^bq_i^a} - \sum_i{p_i^bq_i^a} + \sum{\frac{q_i^b}{Q^b}q_i^ap_i^b} - \sum{\frac{q_i^b}{Q^b}q_i^ap_i^b} \\
+=& \sum_i{p_i^a q_i^a} - \sum_i{p_i^bq_i^a} \tag{variance from price} \\
++& \sum_i{p_i^bq_i^a} - \sum{\frac{q_i^b}{Q^b}q_i^ap_i^b}  \tag{variance from mix} \\
++& \sum{\frac{q_i^b}{Q^b}q_i^ap_i^b} - \sum_i{p_i^bq_i^b} \tag{variance from quantity}
+\end{align}
+$$
+
+```{r}
+qb <- c(50,100,30)    # benchmark quantity
+pb <- c(6,1,5)        # benchmark price
+qa <- c(60,95,50)     # acutal quantity
+pa <- c(7,.5,7)       # actual price
+
+x <- data.frame(qb =qb,pb=pb,qa=qa,pa=pa)
+
+
+```
+
+```{r}
+variancebreakdown <- function(qa,pa,qb,pb,mix = TRUE, isupprice = TRUE) {
+  
+  # b: benchmark
+  # transform to number
+  
+  qa <- as.numeric(qa)
+  pa <- as.numeric(pa)
+  qb <- as.numeric(qb)
+  pb <- as.numeric(pb)
+  
+  # if is amount, then convert to unit price
+  if (!isupprice) {
+    pa <- pa / qa
+    pb <- pb / qb
+  }
+  
+  # replace NaN,NA,Inf to 0
+  
+  iserr <- !is.finite(pa)
+  pa[iserr] <- 0
+  
+  iserr <- !is.finite(pb)
+  pb[iserr] <- 0
+  
+  # check if zero
+  is0 <- pa == 0
+  pa[is0] <- pb[is0]
+  is0 <- pb == 0
+  pb[is0] <- pa[is0]
+  
+  # set NA quantity to 0
+  qa[is.na(qa)] <- 0
+  qb[is.na(qb)] <- 0
+  
+  Qa <- sum(qa)
+  Qb <- sum(qb)
+  
+  # total variance
+  vt <- round(pa * qa - pb * qb,2)
+
+  # variance due to price
+  vp <- round(qa * (pa - pb),2)
+
+  # variance due to mix
+  vm <- round(pb * (qa - Qa * qb / Qb),2)
+
+  # varince due to quantity
+  vq <- round(pb * (Qa * qb / Qb - qb),2)
+  
+  res <- list( summary = format(
+    c(vt = sum(vt), vp = sum(vp), vm = sum(vm), vq =sum(vq))
+    ,scientific = FALSE
+    ,big.mark = " ")
+    , detail = cbind(qa,pa,qb,pb,vt,vp,vm,vq)
+    )
+  
+  return(res)
+}
+
+# use c to pass multiple parameters to do.call
+do.call(variancebreakdown,c(x,isupprice=FALSE))
+
+```
+
